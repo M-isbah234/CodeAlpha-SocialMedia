@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit — mini social</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================== Top bar (authed) ===================== -->
+  <header class="topbar" id="topbar" hidden>
+    <div class="topbar__inner">
+      <button class="brand" data-nav="profile" type="button">
+        <span class="brand__dot"></span> Orbit
+      </button>
+      <button class="icon-btn topbar__logout" id="logout-btn" type="button" title="Log out">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ===================== Auth ===================== -->
+    <section id="auth-view" class="view auth">
+      <div class="auth__card card">
+        <div class="auth__brand">
+          <span class="brand__dot brand__dot--lg"></span>
+          <h1>Orbit</h1>
+          <p class="muted">A tiny place to post, like, follow &amp; chat.</p>
+        </div>
+
+        <!-- Login (shown first) -->
+        <form id="login-form" class="auth__form">
+          <label>Username
+            <input name="username" autocomplete="username" required />
+          </label>
+          <label>Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="btn btn--accent btn--block" type="submit">Log in</button>
+          <p class="auth__switch">
+            New to Orbit?
+            <button type="button" class="linkbtn" id="show-signup">Create an account</button>
+          </p>
+        </form>
+
+        <!-- Sign up (never rendered at the same time as login) -->
+        <form id="signup-form" class="auth__form" hidden>
+          <label>Username
+            <input name="username" autocomplete="username" required />
+          </label>
+          <label>Email <span class="muted">(optional)</span>
+            <input name="email" type="email" autocomplete="email" />
+          </label>
+          <label>Password
+            <input name="password" type="password" autocomplete="new-password" required />
+          </label>
+          <button class="btn btn--accent btn--block" type="submit">Create account</button>
+          <p class="auth__switch">
+            Already have an account?
+            <button type="button" class="linkbtn" id="show-login">Log in</button>
+          </p>
+        </form>
+
+        <p class="form-error" id="auth-error" role="alert"></p>
+      </div>
+    </section>
+
+    <!-- ===================== My Profile (home) ===================== -->
+    <section id="profile-view" class="view" hidden>
+      <div class="profile-head card">
+        <span class="avatar avatar--lg" id="profile-avatar"></span>
+        <div class="profile-head__body">
+          <h2 id="profile-username"></h2>
+          <p id="profile-bio" class="muted"></p>
+          <div class="stats">
+            <span><strong id="stat-posts">0</strong> posts</span>
+            <span><strong id="stat-followers">0</strong> followers</span>
+            <span><strong id="stat-following">0</strong> following</span>
+          </div>
+        </div>
+        <div class="profile-head__action">
+          <button class="btn btn--accent" id="follow-btn" type="button" hidden></button>
+          <button class="btn btn--soft" id="message-btn" type="button" hidden>Message</button>
+          <button class="btn btn--soft" id="edit-profile-btn" type="button" hidden>Edit profile</button>
+        </div>
+      </div>
+
+      <!-- Inline edit form (own profile only) -->
+      <form id="edit-profile-form" class="card edit-profile" hidden>
+        <label>Bio
+          <textarea name="bio" rows="3" maxlength="300" placeholder="Tell people about yourself"></textarea>
+        </label>
+        <label>Avatar
+          <input name="avatar" type="file" accept="image/*" />
+        </label>
+        <div class="edit-profile__foot">
+          <button class="btn btn--soft" type="button" id="edit-cancel">Cancel</button>
+          <button class="btn btn--accent" type="submit">Save</button>
+        </div>
+      </form>
+
+      <!-- Composer: you post from your own space; new posts appear below -->
+      <div class="composer card" id="composer" hidden>
+        <span class="avatar" id="composer-avatar"></span>
+        <form id="post-form" class="composer__form">
+          <textarea name="content" rows="2" maxlength="1000"
+                    placeholder="What's happening?"></textarea>
+          <div class="composer__preview" id="image-preview" hidden>
+            <img alt="preview" />
+            <button type="button" class="composer__preview-remove" id="image-remove" title="Remove">✕</button>
+          </div>
+          <div class="composer__foot">
+            <label class="icon-btn composer__attach" title="Add a photo">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <input type="file" name="image" accept="image/*" hidden id="image-input" />
+            </label>
+            <span class="muted" id="post-count">0 / 1000</span>
+            <button class="btn btn--accent" type="submit">Post</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="profile-feed" class="feed"></div>
+    </section>
+
+    <!-- ===================== Feed (others' posts) ===================== -->
+    <section id="feed-view" class="view" hidden>
+      <h2 class="view__title">Feed</h2>
+      <div id="feed" class="feed"></div>
+    </section>
+
+    <!-- ===================== Search ===================== -->
+    <section id="search-view" class="view" hidden>
+      <h2 class="view__title">Search people</h2>
+      <form id="search-form" class="search-bar card">
+        <svg class="search-bar__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="search" placeholder="Search by username…" autocomplete="off" />
+      </form>
+      <div id="search-results" class="user-list">
+        <p class="empty">Type a username to find people.</p>
+      </div>
+    </section>
+
+    <!-- ===================== Messages ===================== -->
+    <section id="messages-view" class="view" hidden>
+      <!-- Inbox -->
+      <div id="inbox">
+        <h2 class="view__title">Messages</h2>
+        <div id="conversation-list" class="user-list">
+          <p class="empty">Loading…</p>
+        </div>
+      </div>
+
+      <!-- Chat window (hidden until a conversation is opened) -->
+      <div id="chat-panel" class="chat card" hidden>
+        <header class="chat__head">
+          <button class="icon-btn chat__back" id="chat-back" type="button" title="Back">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <button class="chat__peer" id="chat-peer" type="button">
+            <span class="avatar avatar--sm" id="chat-peer-avatar"></span>
+            <span id="chat-peer-name"></span>
+          </button>
+        </header>
+        <div class="chat__scroll" id="chat-scroll"></div>
+        <form class="chat__composer" id="chat-form">
+          <input id="chat-input" placeholder="Type a message…" maxlength="2000" autocomplete="off" required />
+          <button class="btn btn--accent btn--sm" type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== Bottom navigation ===================== -->
+  <nav class="bottom-nav" id="bottom-nav" hidden>
+    <button class="bottom-nav__item" data-nav="search" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Search</span>
+    </button>
+    <button class="bottom-nav__item" data-nav="feed" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg>
+      <span>Feed</span>
+    </button>
+    <button class="bottom-nav__item" data-nav="profile" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      <span>Profile</span>
+    </button>
+    <button class="bottom-nav__item" data-nav="messages" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>
+      <span>Messages</span>
+      <span class="bottom-nav__badge" id="messages-badge" hidden>0</span>
+    </button>
+  </nav>
+
+  <!-- Toast for transient messages -->
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- ===================== Templates ===================== -->
+  <template id="post-template">
+    <article class="post card" data-post-id="">
+      <header class="post__head">
+        <button class="post__author" type="button">
+          <span class="avatar avatar--sm post__avatar"></span>
+          <span class="post__author-name"></span>
+        </button>
+        <div class="post__head-right">
+          <time class="post__time muted"></time>
+          <button class="icon-btn post__delete" type="button" title="Delete post" hidden>✕</button>
+        </div>
+      </header>
+      <p class="post__content"></p>
+      <img class="post__image" alt="" hidden />
+      <footer class="post__actions">
+        <button class="chip like-btn" type="button">
+          <span class="like-icon">♡</span> <span class="like-count">0</span>
+        </button>
+        <button class="chip comment-toggle" type="button">
+          💬 <span class="comment-count">0</span>
+        </button>
+      </footer>
+      <section class="comments" hidden>
+        <form class="comment-form">
+          <input class="comment-input" placeholder="Write a comment…" maxlength="500" required />
+          <button class="btn btn--sm btn--accent" type="submit">Send</button>
+        </form>
+        <ul class="comment-list"></ul>
+      </section>
+    </article>
+  </template>
+
+  <template id="user-card-template">
+    <div class="user-card card" data-user-id="" data-username="">
+      <button class="user-card__main" type="button">
+        <span class="avatar user-card__avatar"></span>
+        <span class="user-card__meta">
+          <span class="user-card__name"></span>
+          <span class="user-card__sub muted"></span>
+        </span>
+      </button>
+      <button class="btn btn--sm follow-toggle" type="button"></button>
+    </div>
+  </template>
+
+  <template id="conversation-template">
+    <button class="user-card card conversation" type="button" data-user-id="" data-username="">
+      <span class="avatar user-card__avatar"></span>
+      <span class="user-card__meta">
+        <span class="user-card__name"></span>
+        <span class="user-card__sub muted conversation__preview"></span>
+      </span>
+      <span class="conversation__badge" hidden></span>
+    </button>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
