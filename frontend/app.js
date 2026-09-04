@@ -6,7 +6,7 @@
 const API_BASE = 'http://127.0.0.1:8000/api';
 
 const state = {
-  token: localStorage.getItem('orbit_token') || null,
+  token: sessionStorage.getItem('orbit_token') || null,
   user: null, // { id, username, avatar }
 };
 
@@ -118,7 +118,7 @@ async function bootstrap() {
       return;
     } catch {
       state.token = null;
-      localStorage.removeItem('orbit_token');
+      sessionStorage.removeItem('orbit_token');
     }
   }
   showChrome(false);
@@ -144,7 +144,7 @@ async function handleAuth(kind, form) {
   const path = kind === 'login' ? '/auth/login/' : '/auth/register/';
   const data = await apiFetch(path, { method: 'POST', body, auth: false });
   state.token = data.token;
-  localStorage.setItem('orbit_token', state.token);
+  sessionStorage.setItem('orbit_token', state.token);
   state.user = { id: data.user.id, username: data.user.username, avatar: data.user.avatar };
   // Clear both auth forms so nothing lingers behind the app.
   qs('#login-form').reset();
@@ -158,7 +158,7 @@ async function logout() {
   try { await apiFetch('/auth/logout/', { method: 'POST' }); } catch { /* token already gone */ }
   state.token = null;
   state.user = null;
-  localStorage.removeItem('orbit_token');
+  sessionStorage.removeItem('orbit_token');
   showChrome(false);
   swapAuthForm('login');
   showView('auth-view', null);
