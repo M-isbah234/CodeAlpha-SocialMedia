@@ -30,6 +30,25 @@
   --nav-h: 74px;
 }
 
+body.dark {
+  --bg: #101c1c;
+  --surface: #1a2a2a;
+  --surface-2: #243838;
+  --border: #2e4545;
+  --text: #e6f0f0;
+  --muted: #8ba5a5;
+  --primary: #0C6262;
+  --primary-strong: #0A5252;
+  --primary-soft: #123030;
+  --accent: #F5B942;
+  --accent-strong: #E7A72C;
+  --on-accent: #3A2C05;
+  --danger: #E5484D;
+  --like: #E5484D;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 10px 30px rgba(0, 0, 0, .2);
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, .15);
+}
+
 /* Critical: author display rules must not defeat [hidden]. */
 [hidden] { display: none !important; }
 
@@ -143,6 +162,16 @@ body {
 .icon-btn:hover { color: var(--primary); background: var(--surface-2); }
 .post__delete:hover { color: var(--danger); }
 
+.hashtag, .mention {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hashtag:hover, .mention:hover {
+  text-decoration: underline;
+}
+
 /* ---------------------------- Avatars ----------------------------- */
 .avatar {
   --size: 46px;
@@ -237,6 +266,10 @@ input[type="search"] { -webkit-appearance: none; }
 .like-btn.is-liked .like-icon { transform: scale(1.15); }
 .like-icon { transition: transform .15s; }
 
+.bookmark-btn.is-bookmarked { color: var(--accent); }
+.bookmark-btn.is-bookmarked .bookmark-icon { transform: scale(1.15); }
+.bookmark-icon { transition: transform .15s; }
+
 /* --------------------------- Comments ----------------------------- */
 .comments { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
 .comment-form { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -280,6 +313,17 @@ button.conversation { cursor: pointer; }
   background: var(--accent); color: var(--on-accent);
   font-size: .75rem; font-weight: 800; display: inline-grid; place-items: center;
 }
+
+/* -------------------------- Notifications ------------------------- */
+.notification-list { list-style: none; margin: 0; padding: 0; }
+.notification {
+  display: flex; gap: 12px; padding: 16px; align-items: center;
+  border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
+}
+.notification:hover { background: var(--surface-2); }
+.notification--unread { background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.notification__text { flex: 1; font-size: 0.95rem; }
+.notification__time { font-size: 0.75rem; color: var(--muted); }
 
 /* ---------------------------- Search ------------------------------ */
 .search-bar { display: flex; align-items: center; gap: 10px; padding: 4px 14px; margin-bottom: 18px; }

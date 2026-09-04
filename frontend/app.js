@@ -20,6 +20,13 @@ function escapeHtml(str = '') {
   ));
 }
 
+function parseTags(text) {
+  let html = escapeHtml(text || '');
+  html = html.replace(/#(\w+)/g, '<span class="hashtag" data-tag="$1">#$1</span>');
+  html = html.replace(/@(\w+)/g, '<span class="mention" data-user="$1">@$1</span>');
+  return html;
+}
+
 function timeAgo(iso) {
   const d = new Date(iso);
   const secs = Math.floor((Date.now() - d.getTime()) / 1000);
@@ -100,7 +107,7 @@ const NAV_FOR = {
   'messages-view': 'messages',
 };
 
-function showView(id, navKey = NAV_FOR[id]) {
+function showView(id, navKey = NAV_FOR[id] || id) {
   qsa('.view').forEach((v) => { v.hidden = v.id !== id; });
   qsa('.bottom-nav__item').forEach((b) => {
     b.classList.toggle('is-active', b.dataset.nav === navKey);
@@ -137,6 +144,8 @@ function enterApp(me = null) {
   if (me) { renderProfile(me); showView('profile-view'); }
   else openMyProfile();
   refreshUnreadBadge();
+  refreshNotifBadge();
+  startNotifPoll();
 }
 
 async function handleAuth(kind, form) {
@@ -155,6 +164,7 @@ async function handleAuth(kind, form) {
 
 async function logout() {
   stopChatPoll();
+  stopNotifPoll();
   try { await apiFetch('/auth/logout/', { method: 'POST' }); } catch { /* token already gone */ }
   state.token = null;
   state.user = null;
@@ -171,13 +181,19 @@ function swapAuthForm(which) {
 }
 
 /* ------------------------------ Feed ------------------------------ */
-async function loadFeed() {
-  showView('feed-view');
+async function loadFeed(hashtag = '') {
+  showView('feed-view', 'feed');
   const feed = qs('#feed');
   feed.innerHTML = '<p class="empty">Loading…</p>';
+  if (hashtag) {
+    qs('#feed-title').textContent = `#${hashtag}`;
+  } else {
+    qs('#feed-title').textContent = 'Feed';
+  }
   try {
-    const posts = await apiFetch('/posts/?feed=true');
-    renderFeed(feed, posts, 'No posts from others yet. Find people in Search!');
+    const url = hashtag ? `/posts/?hashtag=${encodeURIComponent(hashtag)}` : '/posts/?feed=true';
+    const posts = await apiFetch(url);
+    renderFeed(feed, posts, hashtag ? `No posts found for #${hashtag}.` : 'No posts from others yet. Find people in Search!');
   } catch (e) {
     feed.innerHTML = `<p class="empty">${escapeHtml(e.message)}</p>`;
   }
@@ -201,7 +217,7 @@ function renderPost(post) {
   qs('.post__author', node).dataset.username = post.author.username;
   qs('.post__time', node).textContent = timeAgo(post.created_at);
   qs('.post__time', node).title = new Date(post.created_at).toLocaleString();
-  qs('.post__content', node).textContent = post.content || '';
+  qs('.post__content', node).innerHTML = parseTags(post.content);
 
   const img = qs('.post__image', node);
   if (post.image) { img.src = post.image; img.hidden = false; }
@@ -212,6 +228,11 @@ function renderPost(post) {
   const likeBtn = qs('.like-btn', node);
   likeBtn.classList.toggle('is-liked', post.liked);
   qs('.like-icon', node).textContent = post.liked ? '♥' : '♡';
+
+  const bookmarkBtn = qs('.bookmark-btn', node);
+  if (bookmarkBtn) {
+    bookmarkBtn.classList.toggle('is-bookmarked', post.is_bookmarked);
+  }
 
   if (state.user && post.author.id === state.user.id) {
     qs('.post__delete', node).hidden = false;
@@ -262,6 +283,20 @@ async function toggleLike(btn) {
     btn.classList.toggle('is-liked', data.liked);
     qs('.like-icon', btn).textContent = data.liked ? '♥' : '♡';
     qs('.like-count', btn).textContent = data.like_count;
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleBookmark(btn) {
+  const article = btn.closest('.post');
+  const id = article.dataset.postId;
+  btn.disabled = true;
+  try {
+    const data = await apiFetch(`/posts/${id}/bookmark/`, { method: 'POST' });
+    btn.classList.toggle('is-bookmarked', data.bookmarked);
   } catch (e) {
     toast(e.message, true);
   } finally {
@@ -324,7 +359,7 @@ function renderComment(c) {
   author.textContent = c.author.username;
   const text = document.createElement('div');
   text.className = 'comment__text';
-  text.textContent = c.content;
+  text.innerHTML = parseTags(c.content);
   bubble.append(author, text);
 
   li.append(avatar, bubble);
@@ -412,6 +447,30 @@ function renderProfile(p) {
   // Profiles carry their own posts (ProfileDetailSerializer).
   renderFeed(qs('#profile-feed'), p.posts || [],
     isMe ? 'You haven’t posted yet — say hi above!' : 'No posts yet.');
+    
+  if (isMe) {
+    qs('#profile-tabs').hidden = false;
+    // reset tab state
+    qs('#tab-posts').classList.add('is-active');
+    qs('#tab-saved').classList.remove('is-active');
+    qs('#profile-feed').hidden = false;
+    qs('#profile-saved-feed').hidden = true;
+  } else {
+    qs('#profile-tabs').hidden = true;
+    qs('#profile-feed').hidden = false;
+    qs('#profile-saved-feed').hidden = true;
+  }
+}
+
+async function loadSavedPosts() {
+  const feed = qs('#profile-saved-feed');
+  feed.innerHTML = '<p class="empty">Loading saved posts…</p>';
+  try {
+    const posts = await apiFetch('/posts/bookmarks/');
+    renderFeed(feed, posts, 'You haven’t saved any posts yet.');
+  } catch (e) {
+    feed.innerHTML = `<p class="empty">${escapeHtml(e.message)}</p>`;
+  }
 }
 
 function setFollowBtn(btn, following) {
@@ -620,10 +679,77 @@ async function refreshUnreadBadge() {
   } catch { /* non-critical */ }
 }
 
+let notifPoll = null;
+async function refreshNotifBadge() {
+  try {
+    const notifs = await apiFetch('/notifications/');
+    const unread = notifs.filter(n => !n.is_read).length;
+    const badge = qs('#notifications-badge');
+    if (unread > 0) { badge.textContent = unread > 99 ? '99+' : unread; badge.hidden = false; }
+    else badge.hidden = true;
+  } catch { /* non-critical */ }
+}
+function startNotifPoll() {
+  stopNotifPoll();
+  notifPoll = setInterval(refreshNotifBadge, 10000);
+}
+function stopNotifPoll() {
+  if (notifPoll) { clearInterval(notifPoll); notifPoll = null; }
+}
+
+async function loadNotifications() {
+  showView('notifications-view', 'notifications');
+  const list = qs('#notification-list');
+  list.innerHTML = '<li class="empty">Loading…</li>';
+  try {
+    const notifs = await apiFetch('/notifications/');
+    if (!notifs.length) {
+      list.innerHTML = '<li class="empty">No notifications yet.</li>';
+      return;
+    }
+    list.innerHTML = '';
+    notifs.forEach(n => list.appendChild(renderNotification(n)));
+    refreshNotifBadge();
+  } catch (e) {
+    list.innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
+  }
+}
+
+function renderNotification(n) {
+  const li = document.createElement('li');
+  li.className = 'notification' + (n.is_read ? '' : ' notification--unread');
+  
+  const avatar = document.createElement('span');
+  avatar.className = 'avatar avatar--sm';
+  fillAvatar(avatar, n.actor);
+  
+  const text = document.createElement('div');
+  text.className = 'notification__text';
+  text.innerHTML = `<strong>${escapeHtml(n.actor.username)}</strong> ${escapeHtml(n.verb)}`;
+  
+  const time = document.createElement('div');
+  time.className = 'notification__time';
+  time.textContent = timeAgo(n.created_at);
+  
+  li.append(avatar, text, time);
+  
+  li.addEventListener('click', async () => {
+    if (!n.is_read) {
+      li.classList.remove('notification--unread');
+      apiFetch(`/notifications/${n.id}/read/`, { method: 'POST' }).then(refreshNotifBadge).catch(()=>{});
+    }
+    openPublicProfile(n.actor.username);
+  });
+  return li;
+}
+
 /* ----------------------- Event delegation ------------------------- */
 function onContainerClick(e) {
   const likeBtn = e.target.closest('.like-btn');
   if (likeBtn) return toggleLike(likeBtn);
+
+  const bookmarkBtn = e.target.closest('.bookmark-btn');
+  if (bookmarkBtn) return toggleBookmark(bookmarkBtn);
 
   const commentToggle = e.target.closest('.comment-toggle');
   if (commentToggle) return toggleComments(commentToggle);
@@ -642,6 +768,12 @@ function onContainerClick(e) {
   }
   const cardMain = e.target.closest('.user-card__main');
   if (cardMain) return openPublicProfile(cardMain.closest('.user-card').dataset.username);
+
+  const hashtag = e.target.closest('.hashtag');
+  if (hashtag) return loadFeed(hashtag.dataset.tag);
+
+  const mention = e.target.closest('.mention');
+  if (mention) return openPublicProfile(mention.dataset.user);
 
   // Conversation row → open chat
   const convo = e.target.closest('.conversation');
@@ -680,6 +812,21 @@ function init() {
 
   qs('#logout-btn').addEventListener('click', logout);
 
+  // Theme toggle
+  const isDark = localStorage.getItem('orbit_dark') === '1';
+  if (isDark) document.body.classList.add('dark');
+  qs('#theme-toggle').addEventListener('click', () => {
+    const willBeDark = !document.body.classList.contains('dark');
+    document.body.classList.toggle('dark', willBeDark);
+    localStorage.setItem('orbit_dark', willBeDark ? '1' : '0');
+  });
+
+  // Notifications toggle
+  qs('#notifications-btn').addEventListener('click', () => {
+    stopChatPoll();
+    loadNotifications();
+  });
+
   // Bottom navigation
   qsa('[data-nav]').forEach((el) => el.addEventListener('click', () => {
     stopChatPoll();
@@ -690,6 +837,21 @@ function init() {
       case 'messages': loadConversations(); break;
     }
   }));
+
+  // Profile tabs
+  qs('#tab-posts').addEventListener('click', () => {
+    qs('#tab-posts').classList.add('is-active');
+    qs('#tab-saved').classList.remove('is-active');
+    qs('#profile-feed').hidden = false;
+    qs('#profile-saved-feed').hidden = true;
+  });
+  qs('#tab-saved').addEventListener('click', () => {
+    qs('#tab-saved').classList.add('is-active');
+    qs('#tab-posts').classList.remove('is-active');
+    qs('#profile-feed').hidden = true;
+    qs('#profile-saved-feed').hidden = false;
+    loadSavedPosts();
+  });
 
   // Composer (create post with optional image)
   const postForm = qs('#post-form');
