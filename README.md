@@ -20,9 +20,9 @@ social_media/
     └── app.js
 ```
 
-## 1. Backend — set up & run
+## 1. Backend — set up & run (The API & Admin Panel)
 
-From the `social_media/` folder:
+From the `social_media/` folder, open a terminal:
 
 ```bash
 cd backend
@@ -35,17 +35,18 @@ python -m venv .venv
 pip install -r requirements.txt
 python manage.py makemigrations api
 python manage.py migrate
+python seed_demo.py                   # optional, creates demo accounts and data
 python manage.py createsuperuser      # optional, for /admin
 python manage.py runserver            # API at http://127.0.0.1:8000/
 ```
 
-The API lives under `http://127.0.0.1:8000/api/` and the Django admin under
+The API lives under `http://127.0.0.1:8000/api/` and the **Django admin panel** is under
 `http://127.0.0.1:8000/admin/`.
 
-## 2. Frontend — run
+## 2. Frontend — run (The Main Social Media Panel)
 
 The frontend is static. Serve it from its own folder (a server avoids
-`file://` quirks). In a **second terminal**:
+`file://` quirks). **Open a second terminal** from the `social_media/` folder:
 
 ```bash
 cd frontend
@@ -55,6 +56,12 @@ python -m http.server 5500
 Then open **http://127.0.0.1:5500/**. CORS is open in dev, so the page can call
 the API on port 8000. (If you change the API location, edit `API_BASE` at the
 top of `frontend/app.js`.)
+
+## Demo Accounts
+
+If you ran `python seed_demo.py` in the backend, you can log into the frontend with the following demo accounts:
+- **Usernames:** `demo`, `maya_r`, `liam_k`, `zoe_p`, `noah_s`, `aria_j`
+- **Password (for all):** `Orbit12345`
 
 ## API reference
 
