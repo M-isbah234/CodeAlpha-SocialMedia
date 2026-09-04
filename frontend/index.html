@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Orbit — mini social</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <!-- ===================== Top bar (authed) ===================== -->
@@ -13,12 +13,21 @@
       <button class="brand" data-nav="profile" type="button">
         <span class="brand__dot"></span> Orbit
       </button>
-      <div style="display:flex; gap: 8px; align-items:center;">
+      <div style="display:flex; gap: 8px; align-items:center; position:relative;">
         <button class="icon-btn" id="theme-toggle" type="button" title="Toggle dark mode">🌙</button>
-        <button class="icon-btn" id="notifications-btn" type="button" title="Notifications" style="position:relative" data-nav="notifications">
-          🔔
-          <span class="bottom-nav__badge" id="notifications-badge" hidden>0</span>
-        </button>
+        <div style="position:relative;">
+          <button class="icon-btn" id="notifications-btn" type="button" title="Notifications">
+            🔔
+            <span class="bottom-nav__badge" id="notifications-badge" hidden>0</span>
+          </button>
+          <!-- Notification Dropdown -->
+          <div id="notifications-dropdown" class="card" hidden style="position:absolute; top:40px; right:0; width:300px; max-height:400px; overflow-y:auto; z-index:100; box-shadow:var(--shadow);">
+            <h4 style="margin:0; padding:12px; border-bottom:1px solid var(--border); font-size:1rem;">Notifications</h4>
+            <ul id="notification-list" class="notification-list" style="list-style:none; margin:0; padding:0;">
+              <li class="empty" style="padding:12px; text-align:center; color:var(--muted);">Loading…</li>
+            </ul>
+          </div>
+        </div>
         <button class="icon-btn topbar__logout" id="logout-btn" type="button" title="Log out">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
@@ -128,12 +137,7 @@
         </form>
       </div>
 
-      <div class="profile-tabs" style="display:flex; gap:10px; margin-bottom: 12px;" id="profile-tabs" hidden>
-        <button class="chip is-active" id="tab-posts" type="button">Posts</button>
-        <button class="chip" id="tab-saved" type="button">Saved</button>
-      </div>
       <div id="profile-feed" class="feed"></div>
-      <div id="profile-saved-feed" class="feed" hidden></div>
     </section>
 
     <!-- ===================== Feed (others' posts or hashtag) ===================== -->
@@ -154,12 +158,10 @@
       </div>
     </section>
 
-    <!-- ===================== Notifications ===================== -->
-    <section id="notifications-view" class="view" hidden>
-      <h2 class="view__title">Notifications</h2>
-      <ul id="notification-list" class="notification-list card">
-        <li class="empty">Loading…</li>
-      </ul>
+    <!-- ===================== Bookmarks ===================== -->
+    <section id="bookmarks-view" class="view" hidden>
+      <h2 class="view__title">Bookmarks</h2>
+      <div id="bookmarks-feed" class="feed"></div>
     </section>
 
     <!-- ===================== Messages ===================== -->
@@ -205,6 +207,10 @@
     <button class="bottom-nav__item" data-nav="profile" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
       <span>Profile</span>
+    </button>
+    <button class="bottom-nav__item" data-nav="bookmarks" type="button">
+      <span style="font-size:1.2rem;">🔖</span>
+      <span>Saved</span>
     </button>
     <button class="bottom-nav__item" data-nav="messages" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>
@@ -276,6 +282,6 @@
     </button>
   </template>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

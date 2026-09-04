@@ -105,6 +105,7 @@ const NAV_FOR = {
   'feed-view': 'feed',
   'profile-view': 'profile',
   'messages-view': 'messages',
+  'bookmarks-view': 'bookmarks',
 };
 
 function showView(id, navKey = NAV_FOR[id] || id) {
@@ -447,23 +448,11 @@ function renderProfile(p) {
   // Profiles carry their own posts (ProfileDetailSerializer).
   renderFeed(qs('#profile-feed'), p.posts || [],
     isMe ? 'You haven’t posted yet — say hi above!' : 'No posts yet.');
-    
-  if (isMe) {
-    qs('#profile-tabs').hidden = false;
-    // reset tab state
-    qs('#tab-posts').classList.add('is-active');
-    qs('#tab-saved').classList.remove('is-active');
-    qs('#profile-feed').hidden = false;
-    qs('#profile-saved-feed').hidden = true;
-  } else {
-    qs('#profile-tabs').hidden = true;
-    qs('#profile-feed').hidden = false;
-    qs('#profile-saved-feed').hidden = true;
-  }
 }
 
 async function loadSavedPosts() {
-  const feed = qs('#profile-saved-feed');
+  showView('bookmarks-view');
+  const feed = qs('#bookmarks-feed');
   feed.innerHTML = '<p class="empty">Loading saved posts…</p>';
   try {
     const posts = await apiFetch('/posts/bookmarks/');
@@ -698,20 +687,24 @@ function stopNotifPoll() {
 }
 
 async function loadNotifications() {
-  showView('notifications-view', 'notifications');
+  const dropdown = qs('#notifications-dropdown');
+  const willShow = dropdown.hidden;
+  dropdown.hidden = !willShow;
+  if (!willShow) return;
+
   const list = qs('#notification-list');
-  list.innerHTML = '<li class="empty">Loading…</li>';
+  list.innerHTML = '<li class="empty" style="padding:12px; text-align:center; color:var(--muted);">Loading…</li>';
   try {
     const notifs = await apiFetch('/notifications/');
     if (!notifs.length) {
-      list.innerHTML = '<li class="empty">No notifications yet.</li>';
+      list.innerHTML = '<li class="empty" style="padding:12px; text-align:center; color:var(--muted);">No notifications yet.</li>';
       return;
     }
     list.innerHTML = '';
     notifs.forEach(n => list.appendChild(renderNotification(n)));
     refreshNotifBadge();
   } catch (e) {
-    list.innerHTML = `<li class="empty">${escapeHtml(e.message)}</li>`;
+    list.innerHTML = `<li class="empty" style="padding:12px; text-align:center; color:var(--muted);">${escapeHtml(e.message)}</li>`;
   }
 }
 
@@ -738,6 +731,7 @@ function renderNotification(n) {
       li.classList.remove('notification--unread');
       apiFetch(`/notifications/${n.id}/read/`, { method: 'POST' }).then(refreshNotifBadge).catch(()=>{});
     }
+    qs('#notifications-dropdown').hidden = true;
     openPublicProfile(n.actor.username);
   });
   return li;
@@ -814,17 +808,28 @@ function init() {
 
   // Theme toggle
   const isDark = localStorage.getItem('orbit_dark') === '1';
-  if (isDark) document.body.classList.add('dark');
-  qs('#theme-toggle').addEventListener('click', () => {
+  const themeBtn = qs('#theme-toggle');
+  if (isDark) {
+    document.body.classList.add('dark');
+    themeBtn.textContent = '☀️';
+  }
+  themeBtn.addEventListener('click', () => {
     const willBeDark = !document.body.classList.contains('dark');
     document.body.classList.toggle('dark', willBeDark);
+    themeBtn.textContent = willBeDark ? '☀️' : '🌙';
     localStorage.setItem('orbit_dark', willBeDark ? '1' : '0');
   });
 
   // Notifications toggle
-  qs('#notifications-btn').addEventListener('click', () => {
-    stopChatPoll();
+  qs('#notifications-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     loadNotifications();
+  });
+  // Close dropdown on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#notifications-dropdown') && !e.target.closest('#notifications-btn')) {
+      qs('#notifications-dropdown').hidden = true;
+    }
   });
 
   // Bottom navigation
@@ -835,23 +840,9 @@ function init() {
       case 'feed': loadFeed(); break;
       case 'profile': openMyProfile(); break;
       case 'messages': loadConversations(); break;
+      case 'bookmarks': loadSavedPosts(); break;
     }
   }));
-
-  // Profile tabs
-  qs('#tab-posts').addEventListener('click', () => {
-    qs('#tab-posts').classList.add('is-active');
-    qs('#tab-saved').classList.remove('is-active');
-    qs('#profile-feed').hidden = false;
-    qs('#profile-saved-feed').hidden = true;
-  });
-  qs('#tab-saved').addEventListener('click', () => {
-    qs('#tab-saved').classList.add('is-active');
-    qs('#tab-posts').classList.remove('is-active');
-    qs('#profile-feed').hidden = true;
-    qs('#profile-saved-feed').hidden = false;
-    loadSavedPosts();
-  });
 
   // Composer (create post with optional image)
   const postForm = qs('#post-form');
