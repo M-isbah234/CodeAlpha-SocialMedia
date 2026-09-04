@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Comment, Follow, Message, Post, Profile
+from .models import Comment, Follow, Message, Post, Profile, Bookmark, Notification, Hashtag
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -76,11 +76,12 @@ class PostSerializer(serializers.ModelSerializer):
     like_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     liked = serializers.SerializerMethodField()
+    is_bookmarked = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = ['id', 'author', 'content', 'image', 'created_at',
-                  'like_count', 'comment_count', 'liked']
+                  'like_count', 'comment_count', 'liked', 'is_bookmarked']
 
     def get_like_count(self, obj):
         return obj.likes.count()
@@ -93,6 +94,12 @@ class PostSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_is_bookmarked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Bookmark.objects.filter(post=obj, user=request.user).exists()
         return False
 
     def validate(self, attrs):
@@ -129,3 +136,13 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_is_mine(self, obj):
         request = self.context.get('request')
         return bool(request and obj.sender_id == request.user.id)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor = UserSerializer(read_only=True)
+    post_id = serializers.IntegerField(source='post.id', read_only=True, allow_null=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'actor', 'verb', 'post_id', 'is_read', 'created_at']
+
