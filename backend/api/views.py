@@ -7,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Comment, Follow, Like, Message, Post
+from .models import Comment, Follow, Like, Message, Post, Bookmark, Notification, Hashtag
 from .serializers import (
     CommentSerializer,
     MessageSerializer,
@@ -16,6 +16,7 @@ from .serializers import (
     ProfileSerializer,
     RegisterSerializer,
     UserSerializer,
+    NotificationSerializer,
 )
 
 
@@ -116,6 +117,9 @@ class PostListCreate(generics.ListCreateAPIView):
         author = self.request.query_params.get('author')
         if author:
             qs = qs.filter(author_id=author)
+        hashtag = self.request.query_params.get('hashtag')
+        if hashtag:
+            qs = qs.filter(hashtags__name=hashtag.lower())
         # Global feed excludes your own posts (they live on your profile).
         if self.request.query_params.get('feed') and self.request.user.is_authenticated:
             qs = qs.exclude(author=self.request.user)
@@ -157,6 +161,30 @@ def toggle_like(request, post_id):
     if not created:
         like.delete()
     return Response({'liked': created, 'like_count': post.likes.count()})
+
+
+# --------------------------------------------------------------------------- #
+# Bookmarks: /api/posts/<id>/bookmark/ and /api/posts/bookmarks/
+# --------------------------------------------------------------------------- #
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_bookmark(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    bookmark, created = Bookmark.objects.get_or_create(user=request.user, post=post)
+    if not created:
+        bookmark.delete()
+    return Response({'bookmarked': created})
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def bookmarked_posts(request):
+    bookmarks = Bookmark.objects.filter(user=request.user).select_related('post', 'post__author', 'post__author__profile')
+    posts = [b.post for b in bookmarks]
+    # We still want likes/comments prefetching on these posts
+    # But since it's a list, we can just serialize it
+    return Response(PostSerializer(posts, many=True, context={'request': request}).data)
+
 
 
 # --------------------------------------------------------------------------- #
@@ -263,3 +291,23 @@ def send_message(request):
     msg = Message.objects.create(sender=request.user, recipient=recipient, content=content)
     return Response(MessageSerializer(msg, context={'request': request}).data,
                     status=status.HTTP_201_CREATED)
+
+
+# --------------------------------------------------------------------------- #
+# Notifications: /api/notifications/
+# --------------------------------------------------------------------------- #
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def notifications_list(request):
+    qs = Notification.objects.filter(recipient=request.user).select_related('actor', 'actor__profile')[:30]
+    return Response(NotificationSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mark_notification_read(request, notif_id):
+    notif = get_object_or_404(Notification, pk=notif_id, recipient=request.user)
+    notif.is_read = True
+    notif.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
