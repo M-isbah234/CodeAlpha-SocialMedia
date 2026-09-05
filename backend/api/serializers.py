@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Comment, Follow, Message, Post, Profile, Bookmark, Notification, Hashtag
+from .models import Comment, Follow, Message, Post, Profile, Bookmark, Notification, Hashtag, ChatGroup, ChatGroupMembership, GroupMessage
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -130,7 +130,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'recipient', 'content', 'timestamp', 'read_status', 'is_mine']
+        fields = ['id', 'sender', 'recipient', 'content', 'shared_post', 'timestamp', 'read_status', 'is_mine']
         read_only_fields = ['sender', 'recipient', 'read_status']
 
     def get_is_mine(self, obj):
@@ -145,4 +145,37 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'actor', 'verb', 'post_id', 'is_read', 'created_at']
+
+
+class ChatGroupSerializer(serializers.ModelSerializer):
+    members = UserSerializer(many=True, read_only=True)
+    created_by = UserSerializer(read_only=True)
+    image = serializers.ImageField(required=False, allow_null=True)
+    last_message = serializers.SerializerMethodField()
+    is_group = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatGroup
+        fields = ['id', 'name', 'image', 'created_by', 'created_at', 'members', 'last_message', 'is_group']
+
+    def get_last_message(self, obj):
+        last = obj.messages.last()
+        return last.content if last else 'No messages yet.'
+
+    def get_is_group(self, obj):
+        return True
+
+
+class GroupMessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+    is_mine = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GroupMessage
+        fields = ['id', 'group', 'sender', 'content', 'shared_post', 'timestamp', 'is_mine']
+        read_only_fields = ['group', 'sender']
+
+    def get_is_mine(self, obj):
+        request = self.context.get('request')
+        return bool(request and obj.sender_id == request.user.id)
 

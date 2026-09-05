@@ -24,15 +24,20 @@ urlpatterns = [
     path('posts/<int:post_id>/like/', views.toggle_like, name='post-like'),
     path('posts/<int:post_id>/bookmark/', views.toggle_bookmark, name='post-bookmark'),
 
-    # Users / search / follows
-    path('users/search/', views.user_search, name='user-search'),
+    # Users
+    path('users/', views.user_search, name='user-search'),
+    path('users/following/', views.following_list, name='user-following'),
     path('users/<int:user_id>/follow/', views.toggle_follow, name='user-follow'),
     path('users/<str:username>/', views.ProfileDetail.as_view(), name='user-profile'),
 
     # Direct messages
-    path('messages/', views.conversations, name='conversations'),
-    path('messages/send/', views.send_message, name='message-send'),
-    path('messages/<int:user_id>/', views.conversation, name='conversation'),
+    path('messages/', views.conversations),
+    path('messages/send/', views.send_message),
+    path('messages/<int:user_id>/', views.conversation),
+
+    path('groups/', views.groups_list),
+    path('groups/<int:group_id>/', views.group_conversation),
+    path('groups/<int:group_id>/send/', views.send_group_message, name='conversation'),
 
     # Notifications
     path('notifications/', views.notifications_list, name='notifications-list'),

@@ -7,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Comment, Follow, Like, Message, Post, Bookmark, Notification, Hashtag
+from .models import Comment, Follow, Message, Post, Bookmark, Notification, ChatGroup, GroupMessage, ChatGroupMembership
 from .serializers import (
     CommentSerializer,
     MessageSerializer,
@@ -17,6 +17,8 @@ from .serializers import (
     RegisterSerializer,
     UserSerializer,
     NotificationSerializer,
+    ChatGroupSerializer,
+    GroupMessageSerializer,
 )
 
 
@@ -229,6 +231,16 @@ def toggle_follow(request, user_id):
     return Response({'following': created, 'follower_count': target.followers.count()})
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def following_list(request):
+    """List users the current user is following."""
+    follows = Follow.objects.filter(follower=request.user).select_related('following', 'following__profile')
+    users = [f.following for f in follows]
+    data = ProfileSerializer([u.profile for u in users], many=True, context={'request': request}).data
+    return Response(data)
+
+
 # --------------------------------------------------------------------------- #
 # Direct messages: /api/messages/
 # --------------------------------------------------------------------------- #
@@ -282,14 +294,100 @@ def conversation(request, user_id):
 def send_message(request):
     recipient_id = request.data.get('recipient')
     content = (request.data.get('content') or '').strip()
-    if not content:
-        return Response({'detail': 'Message cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
+    shared_post_id = request.data.get('shared_post_id')
+    
+    if not content and not shared_post_id:
+        return Response({'detail': 'Message or shared post required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
     recipient = get_object_or_404(User, pk=recipient_id)
     if recipient == request.user:
         return Response({'detail': "You can't message yourself."},
                         status=status.HTTP_400_BAD_REQUEST)
-    msg = Message.objects.create(sender=request.user, recipient=recipient, content=content)
+                        
+    shared_post = None
+    if shared_post_id:
+        shared_post = get_object_or_404(Post, pk=shared_post_id)
+        
+    msg = Message.objects.create(sender=request.user, recipient=recipient, content=content, shared_post=shared_post)
     return Response(MessageSerializer(msg, context={'request': request}).data,
+                    status=status.HTTP_201_CREATED)
+
+
+# --------------------------------------------------------------------------- #
+# Group Chats: /api/groups/
+# --------------------------------------------------------------------------- #
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def groups_list(request):
+    if request.method == 'GET':
+        groups = request.user.chat_groups.all()
+        return Response(ChatGroupSerializer(groups, many=True, context={'request': request}).data)
+        
+    elif request.method == 'POST':
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'detail': 'Group name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        group = ChatGroup.objects.create(name=name, created_by=request.user)
+        if 'image' in request.FILES:
+            group.image = request.FILES['image']
+            group.save()
+            
+        # Add creator as member
+        ChatGroupMembership.objects.create(group=group, user=request.user)
+        
+        # Add other members
+        member_ids = request.data.getlist('members') if hasattr(request.data, 'getlist') else request.data.get('members', [])
+        if isinstance(member_ids, str):
+            import json
+            try:
+                member_ids = json.loads(member_ids)
+            except:
+                member_ids = [member_ids]
+                
+        for m_id in member_ids:
+            try:
+                u = User.objects.get(pk=m_id)
+                ChatGroupMembership.objects.get_or_create(group=group, user=u)
+            except User.DoesNotExist:
+                continue
+                
+        return Response(ChatGroupSerializer(group, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def group_conversation(request, group_id):
+    group = get_object_or_404(ChatGroup, pk=group_id)
+    if not group.members.filter(id=request.user.id).exists():
+        return Response({'detail': 'Not a member.'}, status=status.HTTP_403_FORBIDDEN)
+        
+    msgs = group.messages.select_related('sender', 'sender__profile', 'shared_post')
+    return Response({
+        'group': ChatGroupSerializer(group, context={'request': request}).data,
+        'messages': GroupMessageSerializer(msgs, many=True, context={'request': request}).data,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def send_group_message(request, group_id):
+    group = get_object_or_404(ChatGroup, pk=group_id)
+    if not group.members.filter(id=request.user.id).exists():
+        return Response({'detail': 'Not a member.'}, status=status.HTTP_403_FORBIDDEN)
+        
+    content = (request.data.get('content') or '').strip()
+    shared_post_id = request.data.get('shared_post_id')
+    
+    if not content and not shared_post_id:
+        return Response({'detail': 'Message or shared post required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    shared_post = None
+    if shared_post_id:
+        shared_post = get_object_or_404(Post, pk=shared_post_id)
+        
+    msg = GroupMessage.objects.create(group=group, sender=request.user, content=content, shared_post=shared_post)
+    return Response(GroupMessageSerializer(msg, context={'request': request}).data,
                     status=status.HTTP_201_CREATED)
 
 

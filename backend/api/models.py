@@ -88,6 +88,7 @@ class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
     content = models.TextField()
+    shared_post = models.ForeignKey(Post, on_delete=models.SET_NULL, null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     read_status = models.BooleanField(default=False)
 
@@ -137,3 +138,41 @@ class Notification(models.Model):
     def __str__(self):
         return f"{self.actor.username} {self.get_verb_display()} -> {self.recipient.username}"
 
+
+class ChatGroup(models.Model):
+    name = models.CharField(max_length=100)
+    image = models.ImageField(upload_to='group_images/', blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_groups')
+    created_at = models.DateTimeField(auto_now_add=True)
+    members = models.ManyToManyField(User, through='ChatGroupMembership', related_name='chat_groups')
+
+    def __str__(self):
+        return self.name
+
+
+class ChatGroupMembership(models.Model):
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['group', 'user'], name='unique_group_member'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} in {self.group.name}"
+
+
+class GroupMessage(models.Model):
+    group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_group_messages')
+    content = models.TextField()
+    shared_post = models.ForeignKey(Post, on_delete=models.SET_NULL, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+        
+    def __str__(self):
+        return f"{self.sender.username} in {self.group.name}: {self.content[:20]}"

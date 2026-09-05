@@ -8,10 +8,10 @@
 </head>
 <body>
   <!-- ===================== Top bar (authed) ===================== -->
-  <header class="topbar" id="topbar" hidden>
+  <nav class="topbar" id="topbar" hidden>
     <div class="topbar__inner">
-      <button class="brand" data-nav="profile" type="button">
-        <span class="brand__dot"></span> Orbit
+      <button class="brand" data-nav="profile" type="button" style="display:flex; align-items:center; gap:8px;">
+        <img src="logo.jpg" alt="Orbit Logo" style="height:32px; width:32px; border-radius:50%; object-fit:cover;"> Orbit
       </button>
       <div style="display:flex; gap: 8px; align-items:center; position:relative;">
         <button class="icon-btn" id="theme-toggle" type="button" title="Toggle dark mode">🌙</button>
@@ -33,7 +33,7 @@
         </button>
       </div>
     </div>
-  </header>
+  </nav>
 
   <main class="container">
     <!-- ===================== Auth ===================== -->
@@ -169,8 +169,16 @@
       <!-- Inbox -->
       <div id="inbox">
         <h2 class="view__title">Messages</h2>
+        <div style="display:flex; gap:10px; margin-bottom:12px;" id="inbox-tabs">
+          <button class="chip is-active" id="tab-direct" type="button">Direct</button>
+          <button class="chip" id="tab-groups" type="button">Groups</button>
+        </div>
         <div id="conversation-list" class="user-list">
           <p class="empty">Loading…</p>
+        </div>
+        <div id="group-list" class="user-list" hidden>
+          <button class="btn btn--accent" id="create-group-btn" style="width:100%; margin-bottom:12px;">Create New Group</button>
+          <div id="groups-feed"></div>
         </div>
       </div>
 
@@ -241,12 +249,10 @@
         <button class="chip like-btn" type="button">
           <span class="like-icon">♡</span> <span class="like-count">0</span>
         </button>
-        <button class="chip comment-toggle" type="button">
-          💬 <span class="comment-count">0</span>
-        </button>
-        <button class="chip bookmark-btn" type="button" style="margin-left: auto;" title="Save post">
-          <span class="bookmark-icon">🔖</span>
-        </button>
+        <span class="muted" style="margin-right:auto;"><span class="comment-count">0</span> comments</span>
+        <button class="icon-btn comment-toggle" title="Comment">💬</button>
+        <button class="icon-btn share-btn" title="Share">↗️</button>
+        <button class="icon-btn bookmark-btn" title="Save">🔖</button>
       </footer>
       <section class="comments" hidden>
         <form class="comment-form">
@@ -282,6 +288,39 @@
     </button>
   </template>
 
-  <script src="app.js?v=2"></script>
+  <!-- ===================== Modals ===================== -->
+  <dialog id="create-group-modal" class="card" style="padding:20px; border:none; border-radius:var(--radius); max-width:400px; width:90%;">
+    <h3>Create Group Chat</h3>
+    <form id="create-group-form">
+      <label>Group Name
+        <input type="text" name="name" required />
+      </label>
+      <label>Group Image
+        <input type="file" name="image" accept="image/*" />
+      </label>
+      <div style="margin-top: 10px;">
+        <label>Select Members</label>
+        <div id="group-members-list" style="max-height:150px; overflow-y:auto; border:1px solid var(--border); padding:8px; border-radius:var(--radius-sm); margin-top:4px;">
+          <p class="empty" style="margin:0;">Loading...</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+        <button type="button" class="btn btn--soft" onclick="document.getElementById('create-group-modal').close()">Cancel</button>
+        <button type="submit" class="btn btn--accent">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="share-modal" class="card" style="padding:20px; border:none; border-radius:var(--radius); max-width:400px; width:90%;">
+    <h3>Share Post</h3>
+    <div id="share-targets" class="user-list" style="max-height:300px; overflow-y:auto; margin-bottom:16px;">
+      <p class="empty">Loading...</p>
+    </div>
+    <div style="display:flex; justify-content:flex-end;">
+      <button type="button" class="btn btn--soft" onclick="document.getElementById('share-modal').close()">Close</button>
+    </div>
+  </dialog>
+
+  <script src="app.js?v=3"></script>
 </body>
 </html>

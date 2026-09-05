@@ -358,6 +358,8 @@ function renderComment(c) {
   const author = document.createElement('span');
   author.className = 'comment__author';
   author.textContent = c.author.username;
+  author.dataset.username = c.author.username;
+  author.style.cursor = 'pointer';
   const text = document.createElement('div');
   text.className = 'comment__text';
   text.innerHTML = parseTags(c.content);
@@ -599,7 +601,8 @@ function openChat(peer) {
 async function fetchConversation() {
   if (!currentPeer) return;
   try {
-    const data = await apiFetch(`/messages/${currentPeer.id}/`);
+    const url = currentPeer.is_group ? `/groups/${currentPeer.id}/` : `/messages/${currentPeer.id}/`;
+    const data = await apiFetch(url);
     paintMessages(data.messages);
   } catch (e) {
     toast(e.message, true);
@@ -621,28 +624,58 @@ function paintMessages(messages) {
 function renderBubble(m) {
   const div = document.createElement('div');
   div.className = 'bubble ' + (m.is_mine ? 'bubble--out' : 'bubble--in');
+  
+  if (currentPeer.is_group && !m.is_mine) {
+    const sender = document.createElement('div');
+    sender.className = 'bubble__sender';
+    sender.textContent = m.sender.username;
+    sender.style.fontSize = '0.75rem';
+    sender.style.opacity = '0.7';
+    sender.style.marginBottom = '2px';
+    div.append(sender);
+  }
+
   const text = document.createElement('span');
   text.textContent = m.content;
+  
   const time = document.createElement('span');
   time.className = 'bubble__time';
   time.textContent = clockTime(m.timestamp);
-  div.append(text, time);
+  
+  div.append(text);
+  
+  if (m.shared_post) {
+    const sp = document.createElement('div');
+    sp.className = 'bubble__shared-post';
+    sp.style.border = '1px solid var(--border)';
+    sp.style.padding = '8px';
+    sp.style.borderRadius = 'var(--radius-sm)';
+    sp.style.marginTop = '4px';
+    sp.style.background = 'var(--surface-2)';
+    sp.innerHTML = `<strong>@${escapeHtml(m.shared_post.author.username)}</strong><br>${escapeHtml(m.shared_post.content || '[Image]')}`;
+    div.append(sp);
+  }
+  
+  div.append(time);
   return div;
 }
 
-async function sendMessage(form) {
+async function sendMessage(form, shared_post_id = null) {
   const input = qs('#chat-input');
-  const content = input.value.trim();
-  if (!content || !currentPeer) return;
-  input.value = '';
+  const content = input ? input.value.trim() : '';
+  if ((!content && !shared_post_id) || !currentPeer) return;
+  if (input) input.value = '';
   try {
-    const msg = await apiFetch('/messages/send/', {
+    const url = currentPeer.is_group ? `/groups/${currentPeer.id}/send/` : '/messages/send/';
+    const body = currentPeer.is_group ? { content, shared_post_id } : { recipient: currentPeer.id, content, shared_post_id };
+    
+    const msg = await apiFetch(url, {
       method: 'POST',
-      body: { recipient: currentPeer.id, content },
+      body,
     });
     paintMessages([msg]);
   } catch (e) {
-    input.value = content; // let them retry
+    if (input) input.value = content; // let them retry
     toast(e.message, true);
   }
 }
@@ -666,6 +699,33 @@ async function refreshUnreadBadge() {
     const convos = await apiFetch('/messages/');
     updateBadge(convos.reduce((n, c) => n + c.unread, 0));
   } catch { /* non-critical */ }
+}
+
+async function loadGroups() {
+  const list = qs('#groups-feed');
+  list.innerHTML = '<p class="empty">Loading groups…</p>';
+  try {
+    const groups = await apiFetch('/groups/');
+    if (!groups.length) {
+      list.innerHTML = '<p class="empty">No groups yet.</p>';
+      return;
+    }
+    list.innerHTML = '';
+    groups.forEach((g) => list.appendChild(renderGroup(g)));
+  } catch (e) {
+    list.innerHTML = `<p class="empty">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function renderGroup(g) {
+  const node = qs('#conversation-template').content.firstElementChild.cloneNode(true);
+  node.dataset.groupId = g.id;
+  node.dataset.name = g.name;
+  node.dataset.isGroup = '1';
+  fillAvatar(qs('.user-card__avatar', node), { username: g.name, avatar: g.image });
+  qs('.user-card__name', node).textContent = g.name;
+  qs('.conversation__preview', node).textContent = g.last_message;
+  return node;
 }
 
 let notifPoll = null;
@@ -754,6 +814,9 @@ function onContainerClick(e) {
   const author = e.target.closest('.post__author');
   if (author) return openPublicProfile(author.dataset.username);
 
+  const commentAuthor = e.target.closest('.comment__author');
+  if (commentAuthor) return openPublicProfile(commentAuthor.dataset.username);
+
   // Search result: follow toggle vs open profile
   const followToggle = e.target.closest('.follow-toggle');
   if (followToggle) {
@@ -768,15 +831,88 @@ function onContainerClick(e) {
 
   const mention = e.target.closest('.mention');
   if (mention) return openPublicProfile(mention.dataset.user);
+  
+  const shareBtn = e.target.closest('.share-btn');
+  if (shareBtn) return openShareModal(shareBtn.closest('.post').dataset.postId);
 
   // Conversation row → open chat
   const convo = e.target.closest('.conversation');
   if (convo) {
-    return openChat({
-      id: Number(convo.dataset.userId),
-      username: convo.dataset.username,
-      avatar: convo.dataset.avatar || null,
+    if (convo.dataset.isGroup === '1') {
+      return openChat({
+        id: Number(convo.dataset.groupId),
+        username: convo.dataset.name,
+        avatar: null,
+        is_group: true
+      });
+    } else {
+      return openChat({
+        id: Number(convo.dataset.userId),
+        username: convo.dataset.username,
+        avatar: convo.dataset.avatar || null,
+        is_group: false
+      });
+    }
+  }
+}
+
+let postToShare = null;
+async function openShareModal(postId) {
+  postToShare = postId;
+  const modal = qs('#share-modal');
+  const targets = qs('#share-targets');
+  targets.innerHTML = '<p class="empty">Loading...</p>';
+  modal.showModal();
+  
+  try {
+    const convos = await apiFetch('/messages/');
+    const groups = await apiFetch('/groups/');
+    
+    targets.innerHTML = '';
+    
+    if (!convos.length && !groups.length) {
+      targets.innerHTML = '<p class="empty">No active conversations or groups.</p>';
+      return;
+    }
+    
+    // Render groups
+    groups.forEach(g => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn--soft';
+      btn.style.display = 'block';
+      btn.style.width = '100%';
+      btn.style.marginBottom = '8px';
+      btn.textContent = `Send to Group: ${g.name}`;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        currentPeer = { id: g.id, is_group: true };
+        await sendMessage(null, postToShare);
+        modal.close();
+        toast('Post shared to group!');
+      };
+      targets.appendChild(btn);
     });
+    
+    // Render Direct Messages
+    convos.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn--soft';
+      btn.style.display = 'block';
+      btn.style.width = '100%';
+      btn.style.marginBottom = '8px';
+      btn.textContent = `Send to: ${c.user.username}`;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        currentPeer = { id: c.user.id, is_group: false };
+        await sendMessage(null, postToShare);
+        modal.close();
+        toast('Post shared!');
+      };
+      targets.appendChild(btn);
+    });
+    
+  } catch (e) {
+    targets.innerHTML = `<p class="empty">${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -843,6 +979,76 @@ function init() {
       case 'bookmarks': loadSavedPosts(); break;
     }
   }));
+
+  // Profile tabs
+  qs('#tab-direct').addEventListener('click', () => {
+    qs('#tab-direct').classList.add('is-active');
+    qs('#tab-groups').classList.remove('is-active');
+    qs('#conversation-list').hidden = false;
+    qs('#group-list').hidden = true;
+  });
+  qs('#tab-groups').addEventListener('click', () => {
+    qs('#tab-groups').classList.add('is-active');
+    qs('#tab-direct').classList.remove('is-active');
+    qs('#conversation-list').hidden = true;
+    qs('#group-list').hidden = false;
+    loadGroups();
+  });
+  
+  qs('#create-group-btn').addEventListener('click', async () => {
+    qs('#create-group-modal').showModal();
+    const membersList = qs('#group-members-list');
+    membersList.innerHTML = '<p class="empty" style="margin:0;">Loading following...</p>';
+    
+    try {
+      const following = await apiFetch('/users/following/');
+      if (!following.length) {
+        membersList.innerHTML = '<p class="empty" style="margin:0;">You are not following anyone yet.</p>';
+        return;
+      }
+      
+      membersList.innerHTML = '';
+      following.forEach(f => {
+        const lbl = document.createElement('label');
+        lbl.style.display = 'flex';
+        lbl.style.alignItems = 'center';
+        lbl.style.gap = '8px';
+        lbl.style.padding = '4px 0';
+        lbl.style.cursor = 'pointer';
+        
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.name = 'members';
+        chk.value = f.user_id;
+        
+        const name = document.createElement('span');
+        name.textContent = f.username;
+        
+        lbl.appendChild(chk);
+        lbl.appendChild(name);
+        membersList.appendChild(lbl);
+      });
+    } catch (e) {
+      membersList.innerHTML = `<p class="empty" style="margin:0; color:var(--danger);">${escapeHtml(e.message)}</p>`;
+    }
+  });
+  qs('#create-group-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = qs('button[type="submit"]', e.target);
+    btn.disabled = true;
+    const fd = new FormData(e.target);
+    // fd.getAll('members') handles checkboxes naturally
+    try {
+      const g = await apiFetch('/groups/', { method: 'POST', body: fd });
+      e.target.reset();
+      qs('#create-group-modal').close();
+      loadGroups();
+    } catch(err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // Composer (create post with optional image)
   const postForm = qs('#post-form');
