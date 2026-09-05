@@ -1,93 +1,143 @@
 # Orbit — Mini Social Media App
 
-A small full-stack social app: **Django + Django REST Framework** API (SQLite)
-with a **vanilla HTML / CSS / JavaScript** frontend.
+A complete, full-stack social media application featuring a robust **Django + Django REST Framework** API (with SQLite) and a clean, responsive **vanilla HTML/CSS/JavaScript** frontend.
 
-Features: register / login (token auth), public profiles with bio & avatar,
-text posts (create / read / delete), comments with a live counter, like/unlike
-(one per user per post), and follow/unfollow (no self-follow).
+## 🌟 Features
 
-```
+- **Authentication:** Secure user registration, login, and token-based authentication.
+- **User Profiles:** Public profiles featuring user bios and avatars.
+- **Social Interactions:** 
+  - Follow and unfollow users (self-following disabled).
+  - Like and unlike posts (limited to one like per user per post).
+- **Content Management:** Create, read, and delete text posts.
+- **Engagement:** Comment on posts with a live comment counter.
+
+## 🛠️ Technology Stack
+
+- **Backend:** Django, Django REST Framework, SQLite
+- **Frontend:** HTML5, CSS3, Vanilla JavaScript
+- **Architecture:** Client-Server model with token-based API authentication
+
+## 📂 Project Structure
+
+```text
 social_media/
-├── backend/          # Django project
-│   ├── config/       # settings, root urls, wsgi/asgi
-│   ├── api/          # models, serializers, views, urls, admin, signals
+├── backend/          # Django API & Admin Panel
+│   ├── config/       # Settings, Root URLs, WSGI/ASGI
+│   ├── api/          # Models, Serializers, Views, URLs, Admin, Signals
 │   ├── manage.py
 │   └── requirements.txt
-└── frontend/         # static client
+└── frontend/         # Static Client application
     ├── index.html
     ├── styles.css
     └── app.js
 ```
 
-## 1. Backend — set up & run (The API & Admin Panel)
+## 🚀 Getting Started
 
-From the `social_media/` folder, open a terminal:
+Follow these steps to set up and run the project locally.
 
-```bash
-cd backend
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS / Linux:
-# source .venv/bin/activate
+### Prerequisites
 
-pip install -r requirements.txt
-python manage.py makemigrations api
-python manage.py migrate
-python seed_demo.py                   # optional, creates demo accounts and data
-python manage.py createsuperuser      # optional, for /admin
-python manage.py runserver            # API at http://127.0.0.1:8000/
-```
+- Python 3.8+ installed on your machine.
+- Git (optional, for version control).
 
-The API lives under `http://127.0.0.1:8000/api/` and the **Django admin panel** is under
-`http://127.0.0.1:8000/admin/`.
+### 1. Backend Setup (API & Admin Panel)
 
-## 2. Frontend — run (The Main Social Media Panel)
+The backend handles all business logic, data persistence, and serves the API.
 
-The frontend is static. Serve it from its own folder (a server avoids
-`file://` quirks). **Open a second terminal** from the `social_media/` folder:
+1. **Navigate to the backend directory:**
+   ```bash
+   cd backend
+   ```
 
-```bash
-cd frontend
-python -m http.server 5500
-```
+2. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv .venv
+   
+   # On Windows:
+   .venv\Scripts\activate
+   # On macOS/Linux:
+   source .venv/bin/activate
+   ```
 
-Then open **http://127.0.0.1:5500/**. CORS is open in dev, so the page can call
-the API on port 8000. (If you change the API location, edit `API_BASE` at the
-top of `frontend/app.js`.)
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## Demo Accounts
+4. **Apply database migrations:**
+   ```bash
+   python manage.py makemigrations api
+   python manage.py migrate
+   ```
 
-If you ran `python seed_demo.py` in the backend, you can log into the frontend with the following demo accounts:
+5. **(Optional) Seed the database with demo data:**
+   ```bash
+   python seed_demo.py
+   ```
+   *This creates sample users, posts, and interactions. Demo accounts are listed below.*
+
+6. **(Optional) Create a superuser for the Django admin panel:**
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+7. **Start the development server:**
+   ```bash
+   python manage.py runserver
+   ```
+   *The API will be available at `http://127.0.0.1:8000/api/` and the admin panel at `http://127.0.0.1:8000/admin/`.*
+
+### 2. Frontend Setup (Social Media Interface)
+
+The frontend is a static single-page application. For the best experience, serve it via a local HTTP server to avoid CORS or `file://` protocol issues.
+
+1. **Open a new terminal window** (leave the backend running).
+2. **Navigate to the frontend directory:**
+   ```bash
+   cd frontend
+   ```
+
+3. **Start a local HTTP server:**
+   ```bash
+   python -m http.server 5500
+   ```
+
+4. **Open the application in your browser:**
+   Navigate to **http://127.0.0.1:5500/** to view and interact with the app.
+
+*(Note: If you change the backend API port, ensure you update the `API_BASE` constant at the top of `frontend/app.js`.)*
+
+## 👥 Demo Accounts
+
+If you executed `python seed_demo.py` during the backend setup, you can log in using any of the following demo credentials:
+
 - **Usernames:** `demo`, `maya_r`, `liam_k`, `zoe_p`, `noah_s`, `aria_j`
-- **Password (for all):** `Orbit12345`
+- **Password (for all accounts):** `Orbit12345`
 
-## API reference
+## 📖 API Reference
 
-| Method | Endpoint                          | Auth | Purpose                          |
-|--------|-----------------------------------|------|----------------------------------|
-| POST   | `/api/auth/register/`             | —    | Create account → returns token   |
-| POST   | `/api/auth/login/`                | —    | Log in → returns token           |
-| POST   | `/api/auth/logout/`               | ✔    | Invalidate current token         |
-| GET/PATCH | `/api/auth/me/`                | ✔    | Current user's profile / update  |
-| GET    | `/api/posts/`                     | —    | Feed (`?author=<id>` to filter)  |
-| POST   | `/api/posts/`                     | ✔    | Create a post                    |
-| GET    | `/api/posts/<id>/`                | —    | Retrieve a post                  |
-| DELETE | `/api/posts/<id>/`                | ✔    | Delete (author only)             |
-| GET    | `/api/posts/<id>/comments/`       | —    | List comments                    |
-| POST   | `/api/posts/<id>/comments/`       | ✔    | Add a comment                    |
-| POST   | `/api/posts/<id>/like/`           | ✔    | Toggle like/unlike               |
-| GET    | `/api/users/<id>/`                | —    | Public profile + counts          |
-| POST   | `/api/users/<id>/follow/`         | ✔    | Toggle follow/unfollow           |
+| Method | Endpoint                          | Auth Required | Description                      |
+|--------|-----------------------------------|---------------|----------------------------------|
+| POST   | `/api/auth/register/`             | No            | Create a new account & get token |
+| POST   | `/api/auth/login/`                | No            | Log in & get token               |
+| POST   | `/api/auth/logout/`               | Yes           | Invalidate current token         |
+| GET/PATCH | `/api/auth/me/`                | Yes           | Get/Update current user profile  |
+| GET    | `/api/posts/`                     | No            | View feed (`?author=<id>`)       |
+| POST   | `/api/posts/`                     | Yes           | Create a new post                |
+| GET    | `/api/posts/<id>/`                | No            | Retrieve a specific post         |
+| DELETE | `/api/posts/<id>/`                | Yes           | Delete a post (author only)      |
+| GET    | `/api/posts/<id>/comments/`       | No            | List comments on a post          |
+| POST   | `/api/posts/<id>/comments/`       | Yes           | Add a comment to a post          |
+| POST   | `/api/posts/<id>/like/`           | Yes           | Toggle like/unlike on a post     |
+| GET    | `/api/users/<id>/`                | No            | View public profile & stats      |
+| POST   | `/api/users/<id>/follow/`         | Yes           | Toggle follow/unfollow a user    |
 
-Authenticated requests send the header: `Authorization: Token <your-token>`.
+*Note: Authenticated requests must include the header `Authorization: Token <your-token>`.*
 
-## Notes
+## 💡 Architecture Notes
 
-- **Auth model:** DRF `TokenAuthentication`. The token is stored in the
-  browser's `localStorage` and attached to every write request.
-- Every new user automatically gets a `Profile` (via a `post_save` signal).
-- Uniqueness is enforced at the DB level: one like per `(user, post)`, one
-  follow per `(follower, following)`, plus a check constraint blocking
-  self-follows.
+- **Authentication Model:** Uses DRF `TokenAuthentication`. The token is securely stored in the browser's `localStorage` and attached to outgoing authenticated requests.
+- **User Profiles:** A `Profile` instance is automatically generated for every new user via a Django `post_save` signal.
+- **Data Integrity:** Database-level constraints ensure uniqueness for likes (one per `(user, post)`) and follows (one per `(follower, following)`). A check constraint actively prevents users from following themselves.
